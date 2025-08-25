@@ -205,6 +205,25 @@
             margin-bottom: 10px;
         }
         
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-approved {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
         .admin-link {
             margin-top: 30px;
             text-align: center;
@@ -236,6 +255,22 @@
         
         .visible {
             display: block;
+        }
+        
+        .auto-check {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fc;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .auto-check label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -308,7 +343,7 @@
                     <i class="fas fa-user-circle"></i>
                     <h2>Selamat Datang, <span id="user-name">User</span>!</h2>
                     <p>Email: <span id="user-email">user@example.com</span></p>
-                    <p>Status: <span id="user-status" class="status-badge">Menunggu</span></p>
+                    <p>Status: <span id="user-status" class="status-badge status-pending">Menunggu</span></p>
                 </div>
                 
                 <div id="admin-notification" class="notification notification-info">
@@ -327,14 +362,19 @@
                     </div>
                 </div>
                 
-                <button class="btn logout-btn" onclick="logout()">
+                <button class="btn" onclick="logout()">
                     <i class="fas fa-sign-out-alt"></i> Logout
                 </button>
                 
-                <div style="margin-top: 20px;">
-                    <button class="btn" onclick="checkApprovalStatus()">
-                        <i class="fas fa-sync-alt"></i> Periksa Status
-                    </button>
+                <button class="btn" onclick="checkApprovalStatus()" style="margin-left: 10px;">
+                    <i class="fas fa-sync-alt"></i> Periksa Status
+                </button>
+                
+                <div class="auto-check">
+                    <label>
+                        <input type="checkbox" id="auto-check-toggle" checked>
+                        <span>Periksa status otomatis setiap 10 detik</span>
+                    </label>
                 </div>
             </div>
         </div>
@@ -352,6 +392,7 @@
         // Data pengguna (disimulasikan)
         let users = JSON.parse(localStorage.getItem('users')) || [];
         let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+        let autoCheckInterval = null;
         
         // Inisialisasi data jika belum ada
         function initializeData() {
@@ -412,6 +453,9 @@
                 
                 // Tampilkan dashboard
                 showUserDashboard();
+                
+                // Mulai pengecekan otomatis jika diaktifkan
+                startAutoCheck();
             } else {
                 notification.className = 'notification notification-error';
                 notification.innerHTML = '<i class="fas fa-exclamation-circle"></i> Email atau password salah!';
@@ -508,46 +552,70 @@
         
         // Fungsi untuk memperbarui status pengguna
         function updateUserStatus() {
-            const statusElement = document.getElementById('user-status');
+            // Ambil data terbaru dari localStorage
+            const updatedUsers = JSON.parse(localStorage.getItem('users')) || [];
+            const updatedUser = updatedUsers.find(u => u.id === currentUser.id);
             
-            if (currentUser.approved) {
-                statusElement.textContent = 'Disetujui';
-                statusElement.className = 'status-badge status-approved';
-                document.getElementById('admin-notification').classList.add('hidden');
-                document.getElementById('approved-notification').classList.remove('hidden');
-            } else {
-                statusElement.textContent = 'Menunggu';
-                statusElement.className = 'status-badge status-pending';
-                document.getElementById('admin-notification').classList.remove('hidden');
-                document.getElementById('approved-notification').classList.add('hidden');
+            if (updatedUser) {
+                // Perbarui status
+                currentUser.approved = updatedUser.approved;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                const statusElement = document.getElementById('user-status');
+                
+                if (currentUser.approved) {
+                    statusElement.textContent = 'Disetujui';
+                    statusElement.className = 'status-badge status-approved';
+                    document.getElementById('admin-notification').classList.add('hidden');
+                    document.getElementById('approved-notification').classList.remove('hidden');
+                } else {
+                    statusElement.textContent = 'Menunggu';
+                    statusElement.className = 'status-badge status-pending';
+                    document.getElementById('admin-notification').classList.remove('hidden');
+                    document.getElementById('approved-notification').classList.add('hidden');
+                }
             }
         }
         
         // Fungsi untuk memeriksa status persetujuan
         function checkApprovalStatus() {
-            // Perbarui data dari localStorage
-            const updatedUsers = JSON.parse(localStorage.getItem('users')) || [];
-            const updatedUser = updatedUsers.find(u => u.id === currentUser.id);
+            updateUserStatus();
             
-            if (updatedUser) {
-                currentUser = updatedUser;
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                updateUserStatus();
-                
-                const notification = document.getElementById('login-notification');
-                notification.className = 'notification notification-info';
-                notification.innerHTML = '<i class="fas fa-info-circle"></i> Status telah diperbarui!';
-                notification.classList.remove('hidden');
-                
-                // Sembunyikan notifikasi setelah 3 detik
-                setTimeout(() => {
-                    notification.classList.add('hidden');
-                }, 3000);
+            const notification = document.getElementById('login-notification');
+            notification.className = 'notification notification-info';
+            notification.innerHTML = '<i class="fas fa-info-circle"></i> Status telah diperbarui!';
+            notification.classList.remove('hidden');
+            
+            // Sembunyikan notifikasi setelah 3 detik
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 3000);
+        }
+        
+        // Fungsi untuk memulai pengecekan otomatis
+        function startAutoCheck() {
+            // Hentikan interval sebelumnya jika ada
+            if (autoCheckInterval) {
+                clearInterval(autoCheckInterval);
+            }
+            
+            // Mulai interval baru jika checkbox dicentang
+            if (document.getElementById('auto-check-toggle').checked) {
+                autoCheckInterval = setInterval(() => {
+                    console.log("Memeriksa status persetujuan...");
+                    updateUserStatus();
+                }, 10000); // Periksa setiap 10 detik
             }
         }
         
         // Fungsi untuk logout pengguna
         function logout() {
+            // Hentikan pengecekan otomatis
+            if (autoCheckInterval) {
+                clearInterval(autoCheckInterval);
+                autoCheckInterval = null;
+            }
+            
             currentUser = null;
             localStorage.removeItem('currentUser');
             
@@ -569,11 +637,22 @@
             // Periksa apakah user sudah login
             if (currentUser) {
                 showUserDashboard();
+                startAutoCheck();
             }
             
             // Set nilai default untuk demo
             document.getElementById('login-email').value = 'ahmad@example.com';
             document.getElementById('login-password').value = 'password123';
+            
+            // Tambahkan event listener untuk toggle auto check
+            document.getElementById('auto-check-toggle').addEventListener('change', function() {
+                if (this.checked && currentUser) {
+                    startAutoCheck();
+                } else if (autoCheckInterval) {
+                    clearInterval(autoCheckInterval);
+                    autoCheckInterval = null;
+                }
+            });
         };
     </script>
 </body>
