@@ -272,6 +272,15 @@
             gap: 10px;
             cursor: pointer;
         }
+
+        .debug-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fc;
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--dark);
+        }
     </style>
 </head>
 <body>
@@ -344,6 +353,7 @@
                     <h2>Selamat Datang, <span id="user-name">User</span>!</h2>
                     <p>Email: <span id="user-email">user@example.com</span></p>
                     <p>Status: <span id="user-status" class="status-badge status-pending">Menunggu</span></p>
+                    <p>ID: <span id="user-id">-</span></p>
                 </div>
                 
                 <div id="admin-notification" class="notification notification-info">
@@ -376,6 +386,12 @@
                         <span>Periksa status otomatis setiap 10 detik</span>
                     </label>
                 </div>
+
+                <div class="debug-info">
+                    <p><strong>Info Debug:</strong></p>
+                    <p>Total pengguna: <span id="debug-user-count">0</span></p>
+                    <p>Data tersimpan: <span id="debug-data-saved">Tidak</span></p>
+                </div>
             </div>
         </div>
     </div>
@@ -390,13 +406,15 @@
 
     <script>
         // Data pengguna (disimulasikan)
-        let users = JSON.parse(localStorage.getItem('users')) || [];
-        let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+        let users = [];
+        let currentUser = null;
         let autoCheckInterval = null;
         
         // Inisialisasi data jika belum ada
         function initializeData() {
-            if (users.length === 0) {
+            const storedUsers = localStorage.getItem('users');
+            
+            if (!storedUsers) {
                 users = [
                     {
                         id: 1,
@@ -404,7 +422,7 @@
                         email: "ahmad@example.com",
                         password: "password123",
                         approved: false,
-                        registeredAt: "2023-05-15T10:30:00Z"
+                        registeredAt: new Date().toISOString()
                     },
                     {
                         id: 2,
@@ -412,19 +430,18 @@
                         email: "siti@example.com",
                         password: "password123",
                         approved: true,
-                        registeredAt: "2023-05-10T14:22:00Z"
-                    },
-                    {
-                        id: 3,
-                        name: "Budi Santoso",
-                        email: "budi@example.com",
-                        password: "password123",
-                        approved: false,
-                        registeredAt: "2023-05-18T09:15:00Z"
+                        registeredAt: new Date().toISOString()
                     }
                 ];
                 localStorage.setItem('users', JSON.stringify(users));
+                console.log("Data pengguna diinisialisasi");
+            } else {
+                users = JSON.parse(storedUsers);
+                console.log("Data pengguna dimuat dari localStorage");
             }
+            
+            // Perbarui info debug
+            updateDebugInfo();
         }
         
         // Fungsi untuk login pengguna
@@ -523,6 +540,9 @@
             notification.innerHTML = '<i class="fas fa-check-circle"></i> Pendaftaran berhasil! Silakan login dan tunggu persetujuan admin.';
             notification.classList.remove('hidden');
             
+            // Perbarui info debug
+            updateDebugInfo();
+            
             // Kosongkan form
             document.getElementById('register-name').value = '';
             document.getElementById('register-email').value = '';
@@ -545,6 +565,7 @@
             document.getElementById('user-dashboard').classList.add('visible');
             document.getElementById('user-name').textContent = currentUser.name;
             document.getElementById('user-email').textContent = currentUser.email;
+            document.getElementById('user-id').textContent = currentUser.id;
             
             // Tampilkan status persetujuan admin
             updateUserStatus();
@@ -575,6 +596,9 @@
                     document.getElementById('approved-notification').classList.add('hidden');
                 }
             }
+            
+            // Perbarui info debug
+            updateDebugInfo();
         }
         
         // Fungsi untuk memeriksa status persetujuan
@@ -608,6 +632,13 @@
             }
         }
         
+        // Fungsi untuk update info debug
+        function updateDebugInfo() {
+            const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
+            document.getElementById('debug-user-count').textContent = storedUsers.length;
+            document.getElementById('debug-data-saved').textContent = localStorage.getItem('users') ? 'Ya' : 'Tidak';
+        }
+        
         // Fungsi untuk logout pengguna
         function logout() {
             // Hentikan pengecekan otomatis
@@ -635,7 +666,9 @@
             initializeData();
             
             // Periksa apakah user sudah login
-            if (currentUser) {
+            const storedUser = localStorage.getItem('currentUser');
+            if (storedUser) {
+                currentUser = JSON.parse(storedUser);
                 showUserDashboard();
                 startAutoCheck();
             }
